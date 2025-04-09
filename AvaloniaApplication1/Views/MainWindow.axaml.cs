@@ -17,7 +17,6 @@ namespace AvaloniaApplication1.Views
         private PixelDataConverter? _converter;
         private Bitmap? _latestFrame;
         private readonly List<Bitmap> _capturedImages = new();
-
         private const string CaptureDirectory = "CapturedImages";
 
         public MainWindow()
@@ -28,6 +27,7 @@ namespace AvaloniaApplication1.Views
             CaptureButton.Click += OnCaptureButtonClicked;
             SaveButton.Click += OnSaveButtonClicked;
             LoadButton.Click += OnLoadButtonClicked;
+            CapturedListBox.SelectionChanged += OnCapturedImageSelected;
             Closed += OnClosed;
         }
 
@@ -46,25 +46,30 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
-            Bitmap captured = CloneBitmap(_latestFrame);
-            _capturedImages.Add(captured);
+            Bitmap clone = CloneBitmap(_latestFrame);
+            _capturedImages.Add(clone);
+            CapturedListBox.ItemsSource = null;
+            CapturedListBox.ItemsSource = _capturedImages;
         }
 
         private void OnSaveButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            if (_capturedImages.Count == 0)
+            if (CapturedListBox.SelectedItems is null || CapturedListBox.SelectedItems.Count == 0)
             {
                 return;
             }
 
             Directory.CreateDirectory(CaptureDirectory);
+            int index = 0;
 
-            for (int i = 0; i < _capturedImages.Count; i++)
+            foreach (var item in CapturedListBox.SelectedItems)
             {
-                string filename = Path.Combine(CaptureDirectory, $"Captured_{i}.png");
-
-                using FileStream stream = File.Create(filename);
-                _capturedImages[i].Save(stream);
+                if (item is Bitmap bitmap)
+                {
+                    string path = Path.Combine(CaptureDirectory, $"Captured_{index++}.png");
+                    using FileStream stream = File.Create(path);
+                    bitmap.Save(stream);
+                }
             }
         }
 
@@ -78,24 +83,36 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
-            string[] files = Directory.GetFiles(CaptureDirectory, "Captured_*.png");
-            foreach (string file in files)
+            var files = Directory.GetFiles(CaptureDirectory, "Captured_*.png");
+            foreach (var file in files)
             {
                 try
                 {
                     using FileStream stream = File.OpenRead(file);
-                    Bitmap bitmap = new Bitmap(stream);
+                    var bitmap = new Bitmap(stream);
                     _capturedImages.Add(bitmap);
                 }
                 catch
                 {
-                    // Skip invalid or unreadable files
+                    // ¹«½Ã
                 }
             }
+
+            CapturedListBox.ItemsSource = null;
+            CapturedListBox.ItemsSource = _capturedImages;
 
             if (_capturedImages.Count > 0)
             {
                 CameraImage.Source = _capturedImages[0];
+                CapturedListBox.SelectedIndex = 0;
+            }
+        }
+
+        private void OnCapturedImageSelected(object? sender, SelectionChangedEventArgs e)
+        {
+            if (CapturedListBox.SelectedItem is Bitmap bitmap)
+            {
+                CameraImage.Source = bitmap;
             }
         }
 
@@ -135,12 +152,14 @@ namespace AvaloniaApplication1.Views
 
         private void DisposeCapturedImages()
         {
-            foreach (Bitmap bitmap in _capturedImages)
+            CapturedListBox.SelectedItems?.Clear();
+            foreach (var bitmap in _capturedImages)
             {
                 bitmap.Dispose();
             }
 
             _capturedImages.Clear();
+            CapturedListBox.ItemsSource = null;
         }
 
         private void OnImageGrabbed(object? sender, ImageGrabbedEventArgs e)
@@ -181,10 +200,10 @@ namespace AvaloniaApplication1.Views
 
         private static Bitmap CloneBitmap(Bitmap source)
         {
-            using MemoryStream memoryStream = new MemoryStream();
-            source.Save(memoryStream);
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            return new Bitmap(memoryStream);
+            using MemoryStream ms = new MemoryStream();
+            source.Save(ms);
+            ms.Seek(0, SeekOrigin.Begin);
+            return new Bitmap(ms);
         }
     }
 }
