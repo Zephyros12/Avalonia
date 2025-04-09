@@ -5,6 +5,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using Basler.Pylon;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -15,6 +16,9 @@ namespace AvaloniaApplication1.Views
         private Camera? _camera;
         private PixelDataConverter? _converter;
         private Bitmap? _latestFrame;
+        private readonly List<Bitmap> _capturedImages = new();
+
+        private const string CaptureDirectory = "CapturedImages";
 
         public MainWindow()
         {
@@ -22,6 +26,8 @@ namespace AvaloniaApplication1.Views
 
             OpenCameraButton.Click += OnOpenCameraClicked;
             CaptureButton.Click += OnCaptureButtonClicked;
+            SaveButton.Click += OnSaveButtonClicked;
+            LoadButton.Click += OnLoadButtonClicked;
             Closed += OnClosed;
         }
 
@@ -40,17 +46,63 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var filename = $"Captured_{timestamp}.png";
-            var path = Path.Combine(AppContext.BaseDirectory, filename);
+            Bitmap captured = CloneBitmap(_latestFrame);
+            _capturedImages.Add(captured);
+        }
 
-            using FileStream stream = File.Create(path);
-            _latestFrame.Save(stream);
+        private void OnSaveButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (_capturedImages.Count == 0)
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(CaptureDirectory);
+
+            for (int i = 0; i < _capturedImages.Count; i++)
+            {
+                string filename = Path.Combine(CaptureDirectory, $"Captured_{i}.png");
+
+                using FileStream stream = File.Create(filename);
+                _capturedImages[i].Save(stream);
+            }
+        }
+
+        private void OnLoadButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            DisposeCapturedImages();
+            _capturedImages.Clear();
+
+            if (!Directory.Exists(CaptureDirectory))
+            {
+                return;
+            }
+
+            string[] files = Directory.GetFiles(CaptureDirectory, "Captured_*.png");
+            foreach (string file in files)
+            {
+                try
+                {
+                    using FileStream stream = File.OpenRead(file);
+                    Bitmap bitmap = new Bitmap(stream);
+                    _capturedImages.Add(bitmap);
+                }
+                catch
+                {
+                    // Skip invalid or unreadable files
+                }
+            }
+
+            if (_capturedImages.Count > 0)
+            {
+                CameraImage.Source = _capturedImages[0];
+            }
         }
 
         private void OnClosed(object? sender, EventArgs e)
         {
             ShutdownCamera();
+            DisposeCapturedImages();
         }
 
         private void InitializeCamera()
@@ -79,6 +131,16 @@ namespace AvaloniaApplication1.Views
 
             _latestFrame?.Dispose();
             _latestFrame = null;
+        }
+
+        private void DisposeCapturedImages()
+        {
+            foreach (Bitmap bitmap in _capturedImages)
+            {
+                bitmap.Dispose();
+            }
+
+            _capturedImages.Clear();
         }
 
         private void OnImageGrabbed(object? sender, ImageGrabbedEventArgs e)
@@ -115,6 +177,14 @@ namespace AvaloniaApplication1.Views
             });
 
             handle.Free();
+        }
+
+        private static Bitmap CloneBitmap(Bitmap source)
+        {
+            using MemoryStream memoryStream = new MemoryStream();
+            source.Save(memoryStream);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            return new Bitmap(memoryStream);
         }
     }
 }
