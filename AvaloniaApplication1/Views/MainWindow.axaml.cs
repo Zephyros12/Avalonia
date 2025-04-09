@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Basler.Pylon;
@@ -17,7 +18,6 @@ namespace AvaloniaApplication1.Views
         private PixelDataConverter? _converter;
         private Bitmap? _latestFrame;
         private readonly List<Bitmap> _capturedImages = new();
-        private const string CaptureDirectory = "CapturedImages";
 
         public MainWindow()
         {
@@ -52,59 +52,90 @@ namespace AvaloniaApplication1.Views
             CapturedListBox.ItemsSource = _capturedImages;
         }
 
-        private void OnSaveButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void OnSaveButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             if (CapturedListBox.SelectedItems is null || CapturedListBox.SelectedItems.Count == 0)
             {
                 return;
             }
 
-            Directory.CreateDirectory(CaptureDirectory);
-            int index = 0;
+            var options = new FilePickerSaveOptions
+            {
+                Title = "Save Captured Image",
+                SuggestedFileName = "Captured",
+                FileTypeChoices = new List<FilePickerFileType>
+                {
+                    new("PNG Files") { Patterns = new[] { "*.png" } }
+                },
+                DefaultExtension = "png"
+            };
 
+            var file = await StorageProvider.SaveFilePickerAsync(options);
+
+            if (file is null)
+            {
+                return;
+            }
+
+            int index = 0;
             foreach (var item in CapturedListBox.SelectedItems)
             {
                 if (item is Bitmap bitmap)
                 {
-                    string path = Path.Combine(CaptureDirectory, $"Captured_{index++}.png");
-                    using FileStream stream = File.Create(path);
+                    string filename = CapturedListBox.SelectedItems.Count == 1
+                        ? file.Path.LocalPath
+                        : Path.Combine(Path.GetDirectoryName(file.Path.LocalPath) ?? ".", $"Captured_{index++}.png");
+
+                    using FileStream stream = File.Create(filename);
                     bitmap.Save(stream);
                 }
             }
         }
 
-        private void OnLoadButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void OnLoadButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            DisposeCapturedImages();
-            _capturedImages.Clear();
+            var options = new FilePickerOpenOptions
+            {
+                Title = "Load Captured Images",
+                AllowMultiple = true,
+                FileTypeFilter = new List<FilePickerFileType>
+                {
+                    new("PNG Files") { Patterns = new[] { "*.png" } }
+                }
+            };
 
-            if (!Directory.Exists(CaptureDirectory))
+            var files = await StorageProvider.OpenFilePickerAsync(options);
+
+            if (files is null || files.Count == 0)
             {
                 return;
             }
 
-            var files = Directory.GetFiles(CaptureDirectory, "Captured_*.png");
+            DisposeCapturedImages();
+            _capturedImages.Clear();
+
             foreach (var file in files)
             {
                 try
                 {
-                    using FileStream stream = File.OpenRead(file);
+                    using FileStream stream = File.OpenRead(file.Path.LocalPath);
                     var bitmap = new Bitmap(stream);
                     _capturedImages.Add(bitmap);
                 }
                 catch
                 {
-                    // ¹«½Ã
+                    // skip
                 }
             }
 
+            CapturedListBox.SelectedItems?.Clear();
             CapturedListBox.ItemsSource = null;
             CapturedListBox.ItemsSource = _capturedImages;
 
             if (_capturedImages.Count > 0)
             {
-                CameraImage.Source = _capturedImages[0];
                 CapturedListBox.SelectedIndex = 0;
+                CameraImage.Source = _capturedImages[0];
             }
         }
 
@@ -153,6 +184,7 @@ namespace AvaloniaApplication1.Views
         private void DisposeCapturedImages()
         {
             CapturedListBox.SelectedItems?.Clear();
+
             foreach (var bitmap in _capturedImages)
             {
                 bitmap.Dispose();
