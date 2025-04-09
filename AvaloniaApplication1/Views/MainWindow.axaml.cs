@@ -17,13 +17,17 @@ namespace AvaloniaApplication1.Views
         public MainWindow()
         {
             InitializeComponent();
-            Opened += OnOpened;
+
+            OpenCameraButton.Click += OnOpenCameraClicked;
             Closed += OnClosed;
         }
 
-        private void OnOpened(object? sender, EventArgs e)
+        private void OnOpenCameraClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            InitializeCamera();
+            if (_camera is null)
+            {
+                InitializeCamera();
+            }
         }
 
         private void OnClosed(object? sender, EventArgs e)
