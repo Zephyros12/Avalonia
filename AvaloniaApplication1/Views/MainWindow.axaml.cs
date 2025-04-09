@@ -8,7 +8,9 @@ using Basler.Pylon;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace AvaloniaApplication1.Views
 {
@@ -31,13 +33,75 @@ namespace AvaloniaApplication1.Views
             Closed += OnClosed;
         }
 
-        private void OnOpenCameraClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void OnOpenCameraClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            if (_camera is null)
+            if (_camera is not null)
             {
-                InitializeCamera();
+                return;
+            }
+
+            var cameraInfos = CameraFinder.Enumerate();
+            if (!cameraInfos.Any())
+            {
+                await MessageBox("No Basler cameras found.");
+                return;
+            }
+
+            var dialog = new CameraSelectionDialog(cameraInfos);
+            await dialog.ShowDialog(this);
+
+            if (dialog.SelectedSerialNumber is not null)
+            {
+                InitializeCamera(dialog.SelectedSerialNumber);
             }
         }
+
+        private void InitializeCamera(string serialNumber)
+        {
+            _camera = new Camera(serialNumber);
+            _camera.Open();
+
+            _converter = new PixelDataConverter
+            {
+                OutputPixelFormat = PixelType.BGRA8packed
+            };
+
+            _camera.StreamGrabber.ImageGrabbed += OnImageGrabbed;
+            _camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
+        }
+
+        private async Task MessageBox(string message)
+        {
+            var msgBox = new Window
+            {
+                Title = "Notice",
+                Width = 300,
+                Height = 150
+            };
+
+            var okButton = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            okButton.Click += (_, _) => msgBox.Close();
+
+            msgBox.Content = new StackPanel
+            {
+                Margin = new Thickness(10),
+                Children =
+        {
+            new TextBlock { Text = message },
+            okButton
+        }
+            };
+
+            await msgBox.ShowDialog(this);
+        }
+
 
         private void OnCaptureButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
@@ -153,20 +217,6 @@ namespace AvaloniaApplication1.Views
             DisposeCapturedImages();
         }
 
-        private void InitializeCamera()
-        {
-            _camera = new Camera();
-            _camera.Open();
-
-            _converter = new PixelDataConverter
-            {
-                OutputPixelFormat = PixelType.BGRA8packed
-            };
-
-            _camera.StreamGrabber.ImageGrabbed += OnImageGrabbed;
-            _camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
-        }
-
         private void ShutdownCamera()
         {
             if (_camera is not null)
@@ -236,6 +286,50 @@ namespace AvaloniaApplication1.Views
             source.Save(ms);
             ms.Seek(0, SeekOrigin.Begin);
             return new Bitmap(ms);
+        }
+    }
+
+    public class CameraSelectionDialog : Window
+    {
+        private readonly ListBox _cameraListBox = new ListBox();
+        public string? SelectedSerialNumber { get; private set; }
+
+        public CameraSelectionDialog(IEnumerable<ICameraInfo> cameras)
+        {
+            Title = "Select Camera";
+            Width = 300;
+            Height = 400;
+
+            _cameraListBox.ItemsSource = cameras.Select(c => c[CameraInfoKey.SerialNumber]);
+            _cameraListBox.Margin = new Thickness(10);
+            _cameraListBox.SelectionMode = SelectionMode.Single;
+
+            var okButton = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Margin = new Thickness(10),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            };
+
+            okButton.Click += (_, _) =>
+            {
+                if (_cameraListBox.SelectedItem is string serial)
+                {
+                    SelectedSerialNumber = serial;
+                    Close();
+                }
+            };
+
+            Content = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock { Text = "Select a camera to connect:", Margin = new Thickness(10) },
+                    _cameraListBox,
+                    okButton
+                }
+            };
         }
     }
 }
