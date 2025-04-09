@@ -5,6 +5,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using Basler.Pylon;
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace AvaloniaApplication1.Views
@@ -13,12 +14,14 @@ namespace AvaloniaApplication1.Views
     {
         private Camera? _camera;
         private PixelDataConverter? _converter;
+        private Bitmap? _latestFrame;
 
         public MainWindow()
         {
             InitializeComponent();
 
             OpenCameraButton.Click += OnOpenCameraClicked;
+            CaptureButton.Click += OnCaptureButtonClicked;
             Closed += OnClosed;
         }
 
@@ -28,6 +31,21 @@ namespace AvaloniaApplication1.Views
             {
                 InitializeCamera();
             }
+        }
+
+        private void OnCaptureButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (_latestFrame is null)
+            {
+                return;
+            }
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var filename = $"Captured_{timestamp}.png";
+            var path = Path.Combine(AppContext.BaseDirectory, filename);
+
+            using FileStream stream = File.Create(path);
+            _latestFrame.Save(stream);
         }
 
         private void OnClosed(object? sender, EventArgs e)
@@ -58,6 +76,9 @@ namespace AvaloniaApplication1.Views
                 _camera.Dispose();
                 _camera = null;
             }
+
+            _latestFrame?.Dispose();
+            _latestFrame = null;
         }
 
         private void OnImageGrabbed(object? sender, ImageGrabbedEventArgs e)
@@ -80,7 +101,9 @@ namespace AvaloniaApplication1.Views
 
             Dispatcher.UIThread.Post(() =>
             {
-                var bitmap = new Bitmap(
+                _latestFrame?.Dispose();
+
+                _latestFrame = new Bitmap(
                     PixelFormat.Bgra8888,
                     AlphaFormat.Unpremul,
                     pointer,
@@ -88,7 +111,7 @@ namespace AvaloniaApplication1.Views
                     new Vector(96, 96),
                     stride);
 
-                CameraImage.Source = bitmap;
+                CameraImage.Source = _latestFrame;
             });
 
             handle.Free();

@@ -4,8 +4,9 @@
         Title="Camera Viewer"
         Width="800" Height="600">
     <Grid RowDefinitions="Auto,*">
-        <StackPanel Orientation="Horizontal" Margin="10">
+        <StackPanel Orientation="Horizontal" Margin="10" Spacing="10">
             <Button x:Name="OpenCameraButton" Content="Open Camera" Width="120" />
+            <Button x:Name="CaptureButton" Content="Capture" Width="120" />
         </StackPanel>
 
         <Image x:Name="CameraImage" Stretch="Uniform" Grid.Row="1" />
