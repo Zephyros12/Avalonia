@@ -18,16 +18,6 @@ namespace AvaloniaApplication1.Views
 {
     public partial class MainWindow : Window
     {
-        public Camera? Camera { get; set; }
-
-        public PixelDataConverter? Converter { get; set; }
-
-        public Bitmap? LatestFrame { get; set; }
-
-        public List<Bitmap> CapturedImages { get; } = new();
-
-        public double ImageScale { get; set; } = 1.0;
-
         public MainWindow()
         {
             InitializeComponent();
@@ -40,6 +30,18 @@ namespace AvaloniaApplication1.Views
             CameraImage.PointerWheelChanged += CameraImage_PointerWheelChanged;
             Closed += MainWindow_Closed;
         }
+
+
+        public double ImageScale { get; set; } = 1.0;
+
+        public List<Bitmap> CapturedImages { get; } = new();
+
+        public Bitmap? LatestFrame { get; set; }
+
+        public PixelDataConverter? Converter { get; set; }
+
+        public Camera? Camera { get; set; }
+
 
         private void CameraImage_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
         {
@@ -56,8 +58,8 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
-            var cameraInfos = CameraFinder.Enumerate();
-            if (!cameraInfos.Any())
+            List<ICameraInfo> cameraInfos = CameraFinder.Enumerate();
+            if (cameraInfos.Count == 0)
             {
                 await ShowMessageBoxAsync("No Basler cameras found.");
                 return;
@@ -103,7 +105,11 @@ namespace AvaloniaApplication1.Views
                 Margin = new Thickness(0, 10, 0, 0)
             };
 
-            okButton.Click += (_, _) => msgBox.Close();
+            void action(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+            {
+                msgBox.Close();
+            }
+            okButton.Click += action;
 
             msgBox.Content = new StackPanel
             {
@@ -144,7 +150,7 @@ namespace AvaloniaApplication1.Views
                 SuggestedFileName = "Captured",
                 FileTypeChoices = new List<FilePickerFileType>
         {
-            new("PNG Files") { Patterns = new[] { "*.png" } }
+            new("PNG Files") { Patterns = ["*.png"] }
         },
                 DefaultExtension = "png"
             };
@@ -156,14 +162,8 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
-            string? dirPath = Path.GetDirectoryName(file.Path.LocalPath);
-            string basePath;
-
-            if (dirPath != null)
-            {
-                basePath = dirPath;
-            }
-            else
+            string? basePath = Path.GetDirectoryName(file.Path.LocalPath);
+            if (basePath is null)
             {
                 basePath = ".";
             }
@@ -190,14 +190,13 @@ namespace AvaloniaApplication1.Views
             {
                 Title = "Load Captured Images",
                 AllowMultiple = true,
-                FileTypeFilter = new List<FilePickerFileType>
-                {
+                FileTypeFilter =
+                [
                     new("PNG Files") { Patterns = ["*.png"] }
-                }
+                ]
             };
 
             var files = await StorageProvider.OpenFilePickerAsync(options);
-
             if (files is null || files.Count == 0)
             {
                 return;
@@ -310,7 +309,7 @@ namespace AvaloniaApplication1.Views
 
         private static Bitmap CloneBitmap(Bitmap source)
         {
-            using MemoryStream ms = new MemoryStream();
+            using MemoryStream ms = new();
             source.Save(ms);
             ms.Seek(0, SeekOrigin.Begin);
             return new Bitmap(ms);
