@@ -2,32 +2,29 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AvaloniaApplication1.Views.MainWindow"
         Title="Camera Viewer"
-        Width="1000" Height="600">
-    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*">
-        <!-- 왼쪽: 버튼들 -->
-        <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Vertical" Margin="10" Spacing="10">
+        Width="1200" Height="800">
+    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="*">
+        <!-- 왼쪽: 버튼 영역 -->
+        <StackPanel Grid.Column="0" Margin="10" Spacing="10" VerticalAlignment="Top">
             <Button x:Name="OpenCameraButton" Content="Open Camera" Width="120" />
             <Button x:Name="CaptureButton" Content="Capture" Width="120" />
             <Button x:Name="SaveButton" Content="Save" Width="120" />
             <Button x:Name="LoadButton" Content="Load" Width="120" />
         </StackPanel>
 
-        <!-- 중앙: 이미지 미리보기 -->
-        <Image x:Name="CameraImage"
-               Grid.Row="1"
-               Grid.Column="0"
-               Grid.ColumnSpan="2"
-               Margin="10"
-               Stretch="Uniform" />
+        <!-- 중앙: 카메라 이미지 (확대됨) -->
+        <Border Grid.Column="1" Margin="10" Background="Black">
+            <Image x:Name="CameraImage"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+        </Border>
 
-        <!-- 오른쪽: 리스트 박스 (캡처된 썸네일들) -->
+        <!-- 오른쪽: 캡처 썸네일 리스트 -->
         <ListBox x:Name="CapturedListBox"
-                 Grid.Row="0"
-                 Grid.RowSpan="2"
-                 Grid.Column="1"
-                 Width="180"
+                 Grid.Column="2"
                  Margin="10"
-                 HorizontalAlignment="Right"
+                 Width="180"
                  SelectionMode="Multiple">
             <ListBox.ItemTemplate>
                 <DataTemplate>

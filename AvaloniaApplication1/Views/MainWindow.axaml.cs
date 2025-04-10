@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Platform;
@@ -11,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Avalonia.Media;
 
 namespace AvaloniaApplication1.Views
 {
@@ -20,6 +22,7 @@ namespace AvaloniaApplication1.Views
         private PixelDataConverter? _converter;
         private Bitmap? _latestFrame;
         private readonly List<Bitmap> _capturedImages = new();
+        private double _imageScale = 1.0;
 
         public MainWindow()
         {
@@ -30,7 +33,16 @@ namespace AvaloniaApplication1.Views
             SaveButton.Click += OnSaveButtonClicked;
             LoadButton.Click += OnLoadButtonClicked;
             CapturedListBox.SelectionChanged += OnCapturedImageSelected;
+            CameraImage.PointerWheelChanged += OnCameraImageWheel;
             Closed += OnClosed;
+        }
+
+        private void OnCameraImageWheel(object? sender, PointerWheelEventArgs e)
+        {
+            const double ZoomStep = 0.1;
+            double delta = e.Delta.Y > 0 ? ZoomStep : -ZoomStep;
+            _imageScale = Math.Clamp(_imageScale + delta, 0.1, 5.0);
+            CameraImage.RenderTransform = new ScaleTransform(_imageScale, _imageScale);
         }
 
         private async void OnOpenCameraClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -93,15 +105,14 @@ namespace AvaloniaApplication1.Views
             {
                 Margin = new Thickness(10),
                 Children =
-        {
-            new TextBlock { Text = message },
-            okButton
-        }
+                {
+                    new TextBlock { Text = message },
+                    okButton
+                }
             };
 
             await msgBox.ShowDialog(this);
         }
-
 
         private void OnCaptureButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
