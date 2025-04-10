@@ -1,18 +1,18 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform.Storage;
-using Avalonia.Platform;
-using Avalonia.Threading;
-using Basler.Pylon;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Basler.Pylon;
 
 namespace AvaloniaApplication1.Views
 {
@@ -28,16 +28,16 @@ namespace AvaloniaApplication1.Views
         {
             InitializeComponent();
 
-            OpenCameraButton.Click += OnOpenCameraClicked;
-            CaptureButton.Click += OnCaptureButtonClicked;
-            SaveButton.Click += OnSaveButtonClicked;
-            LoadButton.Click += OnLoadButtonClicked;
-            CapturedListBox.SelectionChanged += OnCapturedImageSelected;
-            CameraImage.PointerWheelChanged += OnCameraImageWheel;
-            Closed += OnClosed;
+            OpenCameraButton.Click += OpenCameraButton_Click;
+            CaptureButton.Click += CaptureButton_Click;
+            SaveButton.Click += SaveButton_Click;
+            LoadButton.Click += LoadButton_Click;
+            CapturedListBox.SelectionChanged += CapturedListBox_SelectionChanged;
+            CameraImage.PointerWheelChanged += CameraImage_PointerWheelChanged;
+            Closed += MainWindow_Closed;
         }
 
-        private void OnCameraImageWheel(object? sender, PointerWheelEventArgs e)
+        private void CameraImage_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
         {
             const double ZoomStep = 0.1;
             double delta = e.Delta.Y > 0 ? ZoomStep : -ZoomStep;
@@ -45,7 +45,7 @@ namespace AvaloniaApplication1.Views
             CameraImage.RenderTransform = new ScaleTransform(_imageScale, _imageScale);
         }
 
-        private async void OnOpenCameraClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void OpenCameraButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             if (_camera is not null)
             {
@@ -55,7 +55,7 @@ namespace AvaloniaApplication1.Views
             var cameraInfos = CameraFinder.Enumerate();
             if (!cameraInfos.Any())
             {
-                await MessageBox("No Basler cameras found.");
+                await ShowMessageBoxAsync("No Basler cameras found.");
                 return;
             }
 
@@ -78,11 +78,11 @@ namespace AvaloniaApplication1.Views
                 OutputPixelFormat = PixelType.BGRA8packed
             };
 
-            _camera.StreamGrabber.ImageGrabbed += OnImageGrabbed;
+            _camera.StreamGrabber.ImageGrabbed += Camera_StreamGrabber_ImageGrabbed;
             _camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
         }
 
-        private async Task MessageBox(string message)
+        private async Task ShowMessageBoxAsync(string message)
         {
             var msgBox = new Window
             {
@@ -114,7 +114,7 @@ namespace AvaloniaApplication1.Views
             await msgBox.ShowDialog(this);
         }
 
-        private void OnCaptureButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private void CaptureButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             if (_latestFrame is null)
             {
@@ -127,7 +127,7 @@ namespace AvaloniaApplication1.Views
             CapturedListBox.ItemsSource = _capturedImages;
         }
 
-        private async void OnSaveButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void SaveButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             if (CapturedListBox.SelectedItems is null || CapturedListBox.SelectedItems.Count == 0)
             {
@@ -167,7 +167,7 @@ namespace AvaloniaApplication1.Views
             }
         }
 
-        private async void OnLoadButtonClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void LoadButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             var options = new FilePickerOpenOptions
             {
@@ -214,7 +214,7 @@ namespace AvaloniaApplication1.Views
             }
         }
 
-        private void OnCapturedImageSelected(object? sender, SelectionChangedEventArgs e)
+        private void CapturedListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             if (CapturedListBox.SelectedItem is Bitmap bitmap)
             {
@@ -222,7 +222,7 @@ namespace AvaloniaApplication1.Views
             }
         }
 
-        private void OnClosed(object? sender, EventArgs e)
+        private void MainWindow_Closed(object? sender, EventArgs e)
         {
             ShutdownCamera();
             DisposeCapturedImages();
@@ -255,7 +255,7 @@ namespace AvaloniaApplication1.Views
             CapturedListBox.ItemsSource = null;
         }
 
-        private void OnImageGrabbed(object? sender, ImageGrabbedEventArgs e)
+        private void Camera_StreamGrabber_ImageGrabbed(object? sender, ImageGrabbedEventArgs e)
         {
             if (!e.GrabResult.GrabSucceeded || _converter is null)
             {
@@ -303,6 +303,7 @@ namespace AvaloniaApplication1.Views
     public class CameraSelectionDialog : Window
     {
         private readonly ListBox _cameraListBox = new ListBox();
+
         public string? SelectedSerialNumber { get; private set; }
 
         public CameraSelectionDialog(IEnumerable<ICameraInfo> cameras)
