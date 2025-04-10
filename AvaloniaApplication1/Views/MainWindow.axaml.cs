@@ -18,11 +18,15 @@ namespace AvaloniaApplication1.Views
 {
     public partial class MainWindow : Window
     {
-        private Camera? _camera;
-        private PixelDataConverter? _converter;
-        private Bitmap? _latestFrame;
-        private readonly List<Bitmap> _capturedImages = new();
-        private double _imageScale = 1.0;
+        public Camera? Camera { get; set; }
+
+        public PixelDataConverter? Converter { get; set; }
+
+        public Bitmap? LatestFrame { get; set; }
+
+        public List<Bitmap> CapturedImages { get; } = new();
+
+        public double ImageScale { get; set; } = 1.0;
 
         public MainWindow()
         {
@@ -41,13 +45,13 @@ namespace AvaloniaApplication1.Views
         {
             const double ZoomStep = 0.1;
             double delta = e.Delta.Y > 0 ? ZoomStep : -ZoomStep;
-            _imageScale = Math.Clamp(_imageScale + delta, 0.1, 5.0);
-            CameraImage.RenderTransform = new ScaleTransform(_imageScale, _imageScale);
+            ImageScale = Math.Clamp(ImageScale + delta, 0.1, 5.0);
+            CameraImage.RenderTransform = new ScaleTransform(ImageScale, ImageScale);
         }
 
         private async void OpenCameraButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            if (_camera is not null)
+            if (Camera is not null)
             {
                 return;
             }
@@ -70,16 +74,16 @@ namespace AvaloniaApplication1.Views
 
         private void InitializeCamera(string serialNumber)
         {
-            _camera = new Camera(serialNumber);
-            _camera.Open();
+            Camera = new Camera(serialNumber);
+            Camera.Open();
 
-            _converter = new PixelDataConverter
+            Converter = new PixelDataConverter
             {
                 OutputPixelFormat = PixelType.BGRA8packed
             };
 
-            _camera.StreamGrabber.ImageGrabbed += Camera_StreamGrabber_ImageGrabbed;
-            _camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
+            Camera.StreamGrabber.ImageGrabbed += Camera_StreamGrabber_ImageGrabbed;
+            Camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
         }
 
         private async Task ShowMessageBoxAsync(string message)
@@ -116,15 +120,15 @@ namespace AvaloniaApplication1.Views
 
         private void CaptureButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            if (_latestFrame is null)
+            if (LatestFrame is null)
             {
                 return;
             }
 
-            Bitmap clone = CloneBitmap(_latestFrame);
-            _capturedImages.Add(clone);
+            Bitmap clone = CloneBitmap(LatestFrame);
+            CapturedImages.Add(clone);
             CapturedListBox.ItemsSource = null;
-            CapturedListBox.ItemsSource = _capturedImages;
+            CapturedListBox.ItemsSource = CapturedImages;
         }
 
         private async void SaveButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -139,9 +143,9 @@ namespace AvaloniaApplication1.Views
                 Title = "Save Captured Image",
                 SuggestedFileName = "Captured",
                 FileTypeChoices = new List<FilePickerFileType>
-                {
-                    new("PNG Files") { Patterns = new[] { "*.png" } }
-                },
+        {
+            new("PNG Files") { Patterns = new[] { "*.png" } }
+        },
                 DefaultExtension = "png"
             };
 
@@ -152,6 +156,18 @@ namespace AvaloniaApplication1.Views
                 return;
             }
 
+            string? dirPath = Path.GetDirectoryName(file.Path.LocalPath);
+            string basePath;
+
+            if (dirPath != null)
+            {
+                basePath = dirPath;
+            }
+            else
+            {
+                basePath = ".";
+            }
+
             int index = 0;
             foreach (var item in CapturedListBox.SelectedItems)
             {
@@ -159,13 +175,14 @@ namespace AvaloniaApplication1.Views
                 {
                     string filename = CapturedListBox.SelectedItems.Count == 1
                         ? file.Path.LocalPath
-                        : Path.Combine(Path.GetDirectoryName(file.Path.LocalPath) ?? ".", $"Captured_{index++}.png");
+                        : Path.Combine(basePath, $"Captured_{index++}.png");
 
                     using FileStream stream = File.Create(filename);
                     bitmap.Save(stream);
                 }
             }
         }
+
 
         private async void LoadButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
@@ -175,7 +192,7 @@ namespace AvaloniaApplication1.Views
                 AllowMultiple = true,
                 FileTypeFilter = new List<FilePickerFileType>
                 {
-                    new("PNG Files") { Patterns = new[] { "*.png" } }
+                    new("PNG Files") { Patterns = ["*.png"] }
                 }
             };
 
@@ -187,7 +204,7 @@ namespace AvaloniaApplication1.Views
             }
 
             DisposeCapturedImages();
-            _capturedImages.Clear();
+            CapturedImages.Clear();
 
             foreach (var file in files)
             {
@@ -195,7 +212,7 @@ namespace AvaloniaApplication1.Views
                 {
                     using FileStream stream = File.OpenRead(file.Path.LocalPath);
                     var bitmap = new Bitmap(stream);
-                    _capturedImages.Add(bitmap);
+                    CapturedImages.Add(bitmap);
                 }
                 catch
                 {
@@ -205,12 +222,12 @@ namespace AvaloniaApplication1.Views
 
             CapturedListBox.SelectedItems?.Clear();
             CapturedListBox.ItemsSource = null;
-            CapturedListBox.ItemsSource = _capturedImages;
+            CapturedListBox.ItemsSource = CapturedImages;
 
-            if (_capturedImages.Count > 0)
+            if (CapturedImages.Count > 0)
             {
                 CapturedListBox.SelectedIndex = 0;
-                CameraImage.Source = _capturedImages[0];
+                CameraImage.Source = CapturedImages[0];
             }
         }
 
@@ -230,34 +247,34 @@ namespace AvaloniaApplication1.Views
 
         private void ShutdownCamera()
         {
-            if (_camera is not null)
+            if (Camera is not null)
             {
-                _camera.StreamGrabber.Stop();
-                _camera.Close();
-                _camera.Dispose();
-                _camera = null;
+                Camera.StreamGrabber.Stop();
+                Camera.Close();
+                Camera.Dispose();
+                Camera = null;
             }
 
-            _latestFrame?.Dispose();
-            _latestFrame = null;
+            LatestFrame?.Dispose();
+            LatestFrame = null;
         }
 
         private void DisposeCapturedImages()
         {
             CapturedListBox.SelectedItems?.Clear();
 
-            foreach (var bitmap in _capturedImages)
+            foreach (var bitmap in CapturedImages)
             {
                 bitmap.Dispose();
             }
 
-            _capturedImages.Clear();
+            CapturedImages.Clear();
             CapturedListBox.ItemsSource = null;
         }
 
         private void Camera_StreamGrabber_ImageGrabbed(object? sender, ImageGrabbedEventArgs e)
         {
-            if (!e.GrabResult.GrabSucceeded || _converter is null)
+            if (!e.GrabResult.GrabSucceeded || Converter is null)
             {
                 return;
             }
@@ -267,17 +284,17 @@ namespace AvaloniaApplication1.Views
             int height = grabResult.Height;
             int stride = width * 4;
 
-            byte[] buffer = new byte[_converter.GetBufferSizeForConversion(grabResult)];
-            _converter.Convert(buffer, grabResult);
+            byte[] buffer = new byte[Converter.GetBufferSizeForConversion(grabResult)];
+            Converter.Convert(buffer, grabResult);
 
             GCHandle handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             IntPtr pointer = handle.AddrOfPinnedObject();
 
             Dispatcher.UIThread.Post(() =>
             {
-                _latestFrame?.Dispose();
+                LatestFrame?.Dispose();
 
-                _latestFrame = new Bitmap(
+                LatestFrame = new Bitmap(
                     PixelFormat.Bgra8888,
                     AlphaFormat.Unpremul,
                     pointer,
@@ -285,7 +302,7 @@ namespace AvaloniaApplication1.Views
                     new Vector(96, 96),
                     stride);
 
-                CameraImage.Source = _latestFrame;
+                CameraImage.Source = LatestFrame;
             });
 
             handle.Free();
